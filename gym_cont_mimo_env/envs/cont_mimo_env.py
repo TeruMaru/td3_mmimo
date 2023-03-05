@@ -62,6 +62,7 @@ class MIMOEnv(gym.Env):
                                         shape=(self.K*self.L,),
                                         dtype=np.float64)
 
+        self.peak_sinr_step = 0
 
 
     def _get_obs(self):
@@ -88,10 +89,10 @@ class MIMOEnv(gym.Env):
             UEs_pos = self.populate_UEs()
 
         # K by L real down link power allocated to kth UE by jth BS
-        # self.rho = np.ones((self.K, self.L)) * self.max_power_per_UE * 0.5
-        rand_rho = np.random.rand(self.K, self.L)
-        norm_rho = rand_rho/rand_rho.sum(axis=0, keepdims=1)
-        self.rho = norm_rho * self.K * self.max_power_per_UE
+        self.rho = np.ones((self.K, self.L)) * self.max_power_per_UE * 0.5
+        # rand_rho = np.random.rand(self.K, self.L)
+        # norm_rho = rand_rho/rand_rho.sum(axis=0, keepdims=1)
+        # self.rho = norm_rho * self.K * self.max_power_per_UE
         
         signal_MMMSE, interf_MMMSE, prelog_factor = self.get_episode_SINR_components(UEs_pos)
 
@@ -109,6 +110,7 @@ class MIMOEnv(gym.Env):
         self.max_prod_sinr = self.prod_sinr
         self.start_prod_sinr = self.prod_sinr
         self.start_sum_SE = self.compute_sum_se()
+        self.max_sumSE = self.start_sum_SE
 
         return self._get_obs()
 
@@ -157,12 +159,12 @@ class MIMOEnv(gym.Env):
         f"\nExpected action type: {self.action_space.dtype}")
 
         action = action.reshape((self.K, self.L))
-        self.rho += action
+        temp_rho = self.rho + action
         self.elapsed_step += 1
 
         if self.elapsed_step == self.max_steps:
             done = True
-            if self.peek_SE_step == self.elapsed_step:
+            if self.peak_sinr_step == self.elapsed_step:
               reward = 1
             else:
               reward = -1
@@ -170,18 +172,19 @@ class MIMOEnv(gym.Env):
 
         # If no BS has its allocated power exceeds maximum allowable value,
         # set done to Fasle and compute reward
-        if np.all(np.sum(self.rho, axis=0) <= self.K * self.max_power_per_UE) \
-                and np.all(self.rho >= 0):
-            if np.all(self.rho == 0):
+        allocated_pwr_per_cell = np.sum(temp_rho, axis=0)
+        if (np.all(allocated_pwr_per_cell <= self.K * self.max_power_per_UE)) and np.all(temp_rho >= 0):
+            if np.all(temp_rho == 0):
                 done = True
                 print("All power allocated to 0")
                 reward = -1
             else:
+                self.rho = temp_rho
                 reward, done = self.compute_reward()
         else:
-            done = True
+            done = False
             # print(f"Allocated power to each BS {np.sum(self.rho, axis=0)}")
-            reward = -1
+            reward = self.compute_punishment(temp_rho)
 
         return self._get_obs(), reward, done, {}
 
@@ -200,7 +203,7 @@ class MIMOEnv(gym.Env):
             self.max_prod_sinr = prod_sinr
             self.max_sumSE = self.compute_sum_se()
             self.max_prod_rho = self.rho
-            self.peek_sinr_step = self.elapsed_step
+            self.peak_sinr_step = self.elapsed_step
             self.consecutive_keep += 1
             # check if SE is saturated
             if self.consecutive_keep >= self.max_keep:
@@ -215,6 +218,22 @@ class MIMOEnv(gym.Env):
         self.prod_sinr = prod_sinr
         return reward, done
 
+    def compute_punishment(self, false_rho):
+        # Compute spectral efficiency
+        prod_sinr = np.absolute(self.compute_prod_sinr(false_rho, self.avg_channel_gains,
+                                            self.avg_interference_gains))
+        sinr_ratio = prod_sinr / self.max_prod_sinr
+        reward = np.log(sinr_ratio)
+        # reward = sum_SE
+        # Compare current overall SE with previous overall SE,
+        # if it is better the reward is better, else not
+
+        if reward > 0:
+            reward = - reward
+        else:
+            pass
+        return reward
+    
     def get_episode_SINR_components(self, UEs_pos):
         # Communication bandwidth
         B = 20e6

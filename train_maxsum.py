@@ -60,9 +60,6 @@ if __name__ == "__main__":
         env_ver = config["env_ver"]
     else:
         env_ver = args.version
-    # Must use env version 5 and above
-    if env_ver < 6:
-        env_ver = 6
     # End of hyperparameters
 
     nbr_of_BSs = 4
@@ -168,11 +165,12 @@ if __name__ == "__main__":
                f' - Last 100 eps avg score: {avg_score:.2f}'
                f' - Start sum SE: {mimo_net.start_sum_SE:.3f}'
                f' - Max sum SE: {mimo_net.max_sumSE:.3f}'
-               f' - Max at step: {mimo_net.peek_sumse_step}'
-               f' - Stop sum SE: {mimo_net.sum_SE:.3f}'
-               f' - Stopped power:\n{mimo_net.rho}')
+               f' - Max at step: {mimo_net.peak_sinr_step}'
+               f' - Stop sum SE: {mimo_net.compute_sum_se():.3f}'
+               f' - Stopped power:\n{np.sum(mimo_net.rho, axis=0)}')
               )
 
+        print(f"Done episode {episode+1}")
         if (episode+1) % eval_interval == 0:
             validate_train_process(mimo_net, td3_agent, num_tests=2500)
 
