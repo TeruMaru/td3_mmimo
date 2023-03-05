@@ -76,7 +76,7 @@ if __name__ == "__main__":
                     L=nbr_of_BSs, K=nbr_of_UEs, M=100, ASD_deg=10,
                     delta_rho=delta_rho)
 
-    obs_dim = 3*nbr_of_UEs*nbr_of_BSs
+    obs_dim = nbr_of_UEs * nbr_of_BSs * (1 + (nbr_of_UEs * nbr_of_BSs))
     action_dim = mimo_net.action_space.shape[0]
     action_bound = mimo_net.action_space.high[0]
 

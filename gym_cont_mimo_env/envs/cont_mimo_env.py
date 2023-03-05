@@ -65,14 +65,15 @@ class MIMOEnv(gym.Env):
 
 
     def _get_obs(self):
-        # Normalize distance by changing unit from meters to kilometers -> range [0,1]
-        dist_mask = np.kron(self.UEs_BSs_dist / 1e3, [1, 0, 0])
-        # Normalize angle by dividing to pi -> range [-1,1]
-        angle_mask = np.kron(self.UEs_BSs_angle / np.pi, [0, 1, 0])
-        # Normalize power by diving to max power -> range [0,1]
-        power_mask = np.kron(self.rho / self.max_power_per_UE, [0, 0, 1])
-
-        obs = (dist_mask + angle_mask + power_mask).flatten()
+        obs = np.array([])
+        receive_signal_power = self.rho * self.avg_channel_gains # K x L matrix
+        for j in range(self.L):
+            for k in range(self.K):
+                kj_obs = receive_signal_power[k, j]
+                kj_receive_interf_power = self.rho * self.avg_interference_gains[:, :, k ,j] # K x L matrix
+                kj_obs = np.append(kj_obs, kj_receive_interf_power) # 1 x (1 + KL) array
+                obs = np.append(obs, kj_obs)
+        # objs.shape = 1 x KL(1 + KL), i.e. 1 row, KL(1 + KL) columns
         return obs
 
     def reset(self, ref_data=None):
@@ -94,72 +95,124 @@ class MIMOEnv(gym.Env):
         
         signal_MMMSE, interf_MMMSE, prelog_factor = self.get_episode_SINR_components(UEs_pos)
 
+        # Average channel gain tensor of size K x L where element (k,j) is a_jk in (7.2)
         self.avg_channel_gains = signal_MMMSE
+        # Average inteference gain tensor of size K x L x K x L where (i,l,k,j) is b_lijk in (7.3)
         self.avg_interference_gains = interf_MMMSE
 
         self.prelog_factor = prelog_factor
 
-        self.min_SE = np.amin(self.compute_DL_SE(self.rho,
+        self.prod_sinr = self.compute_prod_sinr(self.rho,
                                                  self.avg_channel_gains,
-                                                 self.avg_interference_gains,
-                                                 self.prelog_factor))
+                                                 self.avg_interference_gains)
+        self.max_prod_rho = self.rho
+        self.max_prod_sinr = self.prod_sinr
+        self.start_prod_sinr = self.prod_sinr
+        self.start_sum_SE = self.compute_sum_se()
 
-        self.max_min_SE = self.min_SE
         return self._get_obs()
+
+    def compute_DL_SE(self, dl_power, desired_signal, interference, prelog_factor):
+        '''
+        Compute the SE in Theorem 4.6 using the formulation in (7.1)
+
+        INPUT:
+            dl_power          : K x L matrix where element (k,j) is the downlink transmit
+                                power allocated to UE k in cell j
+            desired_signal    : K x L matrix where element (k,j) is a_jk in (7.2)
+            interference      : K x L x K x L matrix where (i,l,k,j) is b_lijk in (7.3)
+            prelog_factor     : Downlink sequence length to coherence block length ratio, or tau_d/tau_c
+        OUTPUT:
+            SE                : K x L  matrix where element (k,j) is the downlink SE of UE k in cell j
+        '''
+        SE = np.zeros((self.K, self.L))  # real numbers
+        for j in range(self.L):
+            for k in range(self.K):
+                SE[k, j] = prelog_factor * np.log2(1 + ((dl_power[k, j] * desired_signal[k, j]) / (
+                    np.sum(dl_power * interference[:, :, k, j]) + 1)))
+
+        return SE
+
+    def compute_sum_se(self):
+        return np.sum(self.compute_DL_SE(self.rho,self.avg_channel_gains,
+                                        self.avg_interference_gains,
+                                        self.prelog_factor))
+
+    def compute_prod_sinr(self, dl_power, avg_channel_gains, avg_interference_gains):
+        prod_sinr = 1
+        for j in range(self.L):
+            for k in range(self.K):
+                prod_sinr *=  (
+                    (dl_power[k, j] * avg_channel_gains[k, j]) / 
+                    (np.sum(dl_power * avg_interference_gains[:, :, k, j]) + 1)
+                    )
+        return prod_sinr
 
     def step(self, action):
         assert self.action_space.contains(action), ("Invalid action provided."
-        f" An action is a 1D array of shape ({self.K}, {self.L})"
-        f" where each element range from ({-self.delta_rho}, {self.delta_rho})")
+        f" An action is a 1D array of shape ({self.K}* {self.L})"
+        f" where each element range from ({-self.delta_rho}, {self.delta_rho})"
+        f"\nGiven action (shape = {action.shape}, type = {action.dtype}): {action}"
+        f"\nExpected action shape: {self.action_space.shape}"
+        f"\nExpected action type: {self.action_space.dtype}")
 
         action = action.reshape((self.K, self.L))
         self.rho += action
+        self.elapsed_step += 1
+
+        if self.elapsed_step == self.max_steps:
+            done = True
+            if self.peek_SE_step == self.elapsed_step:
+              reward = 1
+            else:
+              reward = -1
+            return self._get_obs(), reward, done, {}
 
         # If no BS has its allocated power exceeds maximum allowable value,
         # set done to Fasle and compute reward
         if np.all(np.sum(self.rho, axis=0) <= self.K * self.max_power_per_UE) \
-        and np.all(self.rho >= 0):
+                and np.all(self.rho >= 0):
             if np.all(self.rho == 0):
                 done = True
-                reward = -10
+                print("All power allocated to 0")
+                reward = -1
             else:
                 reward, done = self.compute_reward()
         else:
             done = True
-            reward = -10
+            # print(f"Allocated power to each BS {np.sum(self.rho, axis=0)}")
+            reward = -1
 
         return self._get_obs(), reward, done, {}
 
     def compute_reward(self):
         # Compute spectral efficiency
-        # Compute spectral efficiency
-        SE = self.compute_DL_SE(self.rho, self.avg_channel_gains,
-                                self.avg_interference_gains,
-                                self.prelog_factor)
-        min_SE = np.amin(SE)
+        prod_sinr = self.compute_prod_sinr(self.rho, self.avg_channel_gains,
+                                            self.avg_interference_gains)
         done = False
+        sinr_ratio = prod_sinr / self.max_prod_sinr
+        reward = np.log(sinr_ratio)
+        # reward = sum_SE
         # Compare current overall SE with previous overall SE,
-        # if it is better the reward, else not
-        if min_SE > self.max_min_SE:
-            self.max_min_SE = min_SE
-            if self.consecutive_keep > 0:
-                self.consecutive_keep = 0
-            reward = 1
-        elif min_SE == self.max_min_SE:
+        # if it is better the reward is better, else not
+
+        if sinr_ratio > 1:
+            self.max_prod_sinr = prod_sinr
+            self.max_sumSE = self.compute_sum_se()
+            self.max_prod_rho = self.rho
+            self.peek_sinr_step = self.elapsed_step
             self.consecutive_keep += 1
             # check if SE is saturated
             if self.consecutive_keep >= self.max_keep:
                 # Encourage the agent to keep SE constant
                 # if it can not be improved anymore
-                reward = 10
+                reward += self.max_keep
                 done = True
-            else:
-                # Small punishment for keeping power allocation scheme unchanged
-                reward = -1
+                self.prod_sinr = prod_sinr
+                return reward, done
         else:
-            reward = -10
-            done = True
-        self.min_SE = min_SE
+            self.consecutive_keep = 0
+        self.prod_sinr = prod_sinr
         return reward, done
 
     def get_episode_SINR_components(self, UEs_pos):
@@ -641,24 +694,3 @@ class MIMOEnv(gym.Env):
         # Convert to real numbers
         interf_MMMSE = np.abs(interf_MMMSE)
         return signal_MMMSE, interf_MMMSE, prelog_factor
-
-    def compute_DL_SE(self, dl_power, desired_signal, interference, prelog_factor):
-        '''
-        Compute the SE in Theorem 4.6 using the formulation in (7.1)
-
-        INPUT:
-            dl_power          : K x L matrix where element (k,j) is the downlink transmit
-                                power allocated to UE k in cell j
-            desired_signal    : K x L matrix where element (k,j) is a_jk in (7.2)
-            interference      : K x L x K x L matrix where (l,i,j,k) is b_lijk in (7.3)
-            prelog_factor     : Downlink sequence length to coherence block length ratio, or tau_d/tau_c
-        OUTPUT:
-            SE                : K x L  matrix where element (k,j) is the downlink SE of UE k in cell j
-        '''
-        SE = np.zeros((self.K, self.L))  # real numbers
-        for j in range(self.L):
-            for k in range(self.K):
-                SE[k, j] = prelog_factor * np.log2(1 + ((dl_power[k, j] * desired_signal[k, j]) / (
-                    np.sum(dl_power * interference[:, :, k, j]) + 1)))
-
-        return SE
