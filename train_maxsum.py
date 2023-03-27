@@ -56,6 +56,7 @@ if __name__ == "__main__":
     critic_hsize = config["critic_hsize"]
     num_episodes = config["num_episodes"]
     delta_rho = config["delta_rho"]
+    max_steps = config["max_steps"]
     if args.version == 0:
         env_ver = config["env_ver"]
     else:
@@ -69,11 +70,13 @@ if __name__ == "__main__":
     # train_log = train_logger(filepath='logs/mimo_maxmin_trainer.txt')
 
     # Create and extract environment information
-    mimo_net = make('gym_cont_mimo_env:mimo-v{}'.format(env_ver),
+    mimo_net = make(f'gym_cont_mimo_env:mimo-v{env_ver}',
                     L=nbr_of_BSs, K=nbr_of_UEs, M=100, ASD_deg=10,
-                    delta_rho=delta_rho)
-
-    obs_dim = nbr_of_UEs * nbr_of_BSs * (1 + (nbr_of_UEs * nbr_of_BSs))
+                    max_steps=max_steps, delta_rho=delta_rho)
+    if env_ver == 0:
+        obs_dim = nbr_of_UEs * nbr_of_BSs * (1 + (nbr_of_UEs * nbr_of_BSs))
+    elif env_ver == 1:
+        obs_dim = nbr_of_UEs * nbr_of_BSs * (2 + (nbr_of_UEs * nbr_of_BSs))
     action_dim = mimo_net.action_space.shape[0]
     action_bound = mimo_net.action_space.high[0]
 
@@ -165,7 +168,7 @@ if __name__ == "__main__":
                f' - Last 100 eps avg score: {avg_score:.2f}'
                f' - Start sum SE: {mimo_net.start_sum_SE:.3f}'
                f' - Max sum SE: {mimo_net.max_sumSE:.3f}'
-               f' - Max at step: {mimo_net.peak_sinr_step}'
+               f' - Max at step: {mimo_net.peak_sumse_step}'
                f' - Stop sum SE: {mimo_net.compute_sum_se():.3f}'
                f' - Stopped power:\n{np.sum(mimo_net.rho, axis=0)}')
               )

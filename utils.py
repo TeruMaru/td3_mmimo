@@ -57,3 +57,12 @@ def plot_SEs_CDF(td3_sumSE, ref_sumSE, save_name=None, xlabel=None):
     plt.plot(ref_unique, ref_cdf, label='sum SE CDF by ref')
     plt.legend()
     plt.savefig(f'data/{save_name}.png')
+
+def compare_results(td3_SE, geo_SE):
+    td3_avg = np.average(td3_SE)
+    print(f"Average SE from TD3 model: {td3_avg}")
+    geo_avg = np.average(geo_SE)
+    print(f"Average SE from geometric progarmming: {geo_avg}")
+    # ratio = ((geo_avg - td3_avg) * 100) / geo_avg
+    ratio = (td3_avg/geo_avg) * 100
+    return ratio

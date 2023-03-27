@@ -11,7 +11,7 @@ import scipy.io as sio
 from itertools import count
 from tensorflow import keras
 from td3_agent import Agent
-from utils import plot_save_cdf, plot_SEs_CDF
+from utils import plot_save_cdf, plot_SEs_CDF, compare_results
 from gym.envs.registration import make
 
 
@@ -61,7 +61,8 @@ def validate_train_process(mimo_net, td3_agent, num_tests=2500):
     np.save('data/potential_diff.npy', potential_diff)
     plot_save_cdf(potential_diff, save_name="potential_diff",
                   xlabel="Potential sum SE difference")
-
+    ratio_to_ref = compare_results(episode_esc_sumSE, ref_maxprod_sumSE)
+    print(f"TD3 model achieved {ratio_to_ref}% as compared to geometric programming")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -132,6 +133,6 @@ if __name__ == "__main__":
     # Load model's weights
     td3_agent.load_models()
 
-    validate_train_process(mimo_net, td3_agent)
+    validate_train_process(mimo_net, td3_agent, num_tests=2500)
 
 

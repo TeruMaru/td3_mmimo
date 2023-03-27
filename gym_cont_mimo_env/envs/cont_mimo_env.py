@@ -6,7 +6,7 @@ from scipy.linalg import toeplitz, sqrtm
 
 class MIMOEnv(gym.Env):
     def __init__(self, L, K, M, ASD_deg, square_length=1000, accuracy=2,
-                max_power_per_UE=100, nbr_realizations=100,
+                max_power_per_UE=100, nbr_realizations=100, max_steps=1000,
                 delta_rho=5, debug=False, val=False):
         '''
         L = Number of BSs and cells
@@ -36,7 +36,7 @@ class MIMOEnv(gym.Env):
         self.delta_rho = delta_rho  # default to 5mW
         self.debug = debug
 
-        self.max_steps = 1000
+        self.max_steps = max_steps
         self.max_keep = 30
         self.validate = val
 
@@ -62,7 +62,7 @@ class MIMOEnv(gym.Env):
                                         shape=(self.K*self.L,),
                                         dtype=np.float64)
 
-        self.peak_sinr_step = 0
+        self.peak_sumse_step = 0
 
 
     def _get_obs(self):
@@ -130,13 +130,18 @@ class MIMOEnv(gym.Env):
         SE = np.zeros((self.K, self.L))  # real numbers
         for j in range(self.L):
             for k in range(self.K):
-                SE[k, j] = prelog_factor * np.log2(1 + ((dl_power[k, j] * desired_signal[k, j]) / (
-                    np.sum(dl_power * interference[:, :, k, j]) + 1)))
+                SE[k, j] = prelog_factor * np.log2(1 + ((dl_power[k, j] * desired_signal[k, j]) / \
+                                                        (np.sum(dl_power * interference[:, :, k, j]) + 1)))
 
         return SE
 
-    def compute_sum_se(self):
-        return np.sum(self.compute_DL_SE(self.rho,self.avg_channel_gains,
+    def compute_sum_se(self, temp_rho=None):
+        if temp_rho is not None:
+            return np.sum(self.compute_DL_SE(temp_rho,self.avg_channel_gains,
+                                        self.avg_interference_gains,
+                                        self.prelog_factor))
+        else:
+            return np.sum(self.compute_DL_SE(self.rho,self.avg_channel_gains,
                                         self.avg_interference_gains,
                                         self.prelog_factor))
 
@@ -164,7 +169,7 @@ class MIMOEnv(gym.Env):
 
         if self.elapsed_step == self.max_steps:
             done = True
-            if self.peak_sinr_step == self.elapsed_step:
+            if self.peak_sumse_step == self.elapsed_step:
               reward = 1
             else:
               reward = -1
@@ -203,7 +208,7 @@ class MIMOEnv(gym.Env):
             self.max_prod_sinr = prod_sinr
             self.max_sumSE = self.compute_sum_se()
             self.max_prod_rho = self.rho
-            self.peak_sinr_step = self.elapsed_step
+            self.peak_sumse_step = self.elapsed_step
             self.consecutive_keep += 1
             # check if SE is saturated
             if self.consecutive_keep >= self.max_keep:
@@ -311,8 +316,7 @@ class MIMOEnv(gym.Env):
         # for i in range(3):
         #     for j in range(3):
         #         BSs_wrapped_pos[no_BS_per_dim*i:no_BS_per_dim*(i+1), no_BS_per_dim*j:no_BS_per_dim*(j+1)] += mask[i, j]
-        BSs_wrapped_pos += np.kron(mask,
-                                   np.ones((no_BS_per_dim, no_BS_per_dim)))
+        BSs_wrapped_pos += np.kron(mask, np.ones((no_BS_per_dim, no_BS_per_dim)))
         return cell_length, BSs_xy_pos, BSs_xy_pos_flatten, BSs_wrapped_pos
 
     def populate_UEs(self):
@@ -391,8 +395,7 @@ class MIMOEnv(gym.Env):
                 ## between (K,) ndarray and (9,1) ndarray, should be of shape (9,K)
                 lj_diff = UEs_pos[:, l] - j_doppelgangers
                 if self.debug:
-                    assert lj_diff.shape == (
-                        9, self.K), "lj_diff is not of shape (9,K)"
+                    assert lj_diff.shape == (9, self.K), "lj_diff is not of shape (9,K)"
                 lj_dist = np.abs(lj_diff)
                 lj_angle = np.angle(lj_diff)
                 ## Select only min distances, so the result should be of shape (K,)
@@ -418,8 +421,7 @@ class MIMOEnv(gym.Env):
                         pass
                     elif self.accuracy == 2:
                         #Use the approximate implementation of the local scattering model
-                        R[:, :, k, l, j] = self.local_scattering_R_approx(
-                            kUEs_jBS_angle[k, j], antenna_spacing)
+                        R[:, :, k, l, j] = self.local_scattering_R_approx(kUEs_jBS_angle[k, j], antenna_spacing)
                         pass
                 # Not considering shadowing
         return R, channel_gain_dB
@@ -713,3 +715,94 @@ class MIMOEnv(gym.Env):
         # Convert to real numbers
         interf_MMMSE = np.abs(interf_MMMSE)
         return signal_MMMSE, interf_MMMSE, prelog_factor
+    
+
+class MIMOEnv_v1(MIMOEnv):
+    def __init__(self, L, K, M, ASD_deg, square_length=1000, accuracy=2,
+                max_power_per_UE=100, nbr_realizations=100, max_steps=1000,
+                delta_rho=5, debug=False, val=False):
+        super().__init__(L, K, M, ASD_deg, square_length=square_length,
+                         accuracy=accuracy, max_power_per_UE=max_power_per_UE,
+                         nbr_realizations=nbr_realizations, max_steps= max_steps,
+                         delta_rho=delta_rho, debug=debug, val=val)
+
+    def _get_obs(self):
+        obs = np.array([])
+        receive_signal_power = self.rho * self.avg_channel_gains # K x L matrix
+        for j in range(self.L):
+            for k in range(self.K):
+                a_kj = self.avg_channel_gains[k, j]
+                b_kj = self.avg_interference_gains[:, :, k ,j] # K x L matrix
+                rho_kj = self.rho[k,j]
+                kj_obs = np.append(rho_kj, a_kj) # 1 x (2) array
+                obs_kj = np.append(kj_obs, b_kj) # 1 x (2 +KL) array
+                obs = np.append(obs, obs_kj)
+        # objs.shape = 1 x KL(2 + KL), i.e. 1 row, KL(2 + KL) columns
+        return obs
+    
+    def reset(self, ref_data=None):
+        self.elapsed_step = 0
+        self.consecutive_keep = 0
+        # K by L real distance from UEs to BS in current episode
+        if self.validate:
+            assert ref_data.shape == (
+                self.K, self.L), "Reference data is not of shape KxL"
+            UEs_pos = ref_data
+        else:
+            UEs_pos = self.populate_UEs()
+
+        # K by L real down link power allocated to kth UE by jth BS
+        self.rho = np.ones((self.K, self.L)) * self.max_power_per_UE * 0.5
+        # rand_rho = np.random.rand(self.K, self.L)
+        # norm_rho = rand_rho/rand_rho.sum(axis=0, keepdims=1)
+        # self.rho = norm_rho * self.K * self.max_power_per_UE
+        
+        signal_MMMSE, interf_MMMSE, prelog_factor = self.get_episode_SINR_components(UEs_pos)
+
+        # Average channel gain tensor of size K x L where element (k,j) is a_jk in (7.2)
+        self.avg_channel_gains = signal_MMMSE
+        # Average inteference gain tensor of size K x L x K x L where (i,l,k,j) is b_lijk in (7.3)
+        self.avg_interference_gains = interf_MMMSE
+
+        self.prelog_factor = prelog_factor
+
+        self.start_sum_SE = self.compute_sum_se()
+        self.max_sumSE = self.start_sum_SE
+
+        return self._get_obs()
+    
+    def compute_reward(self):
+        sum_se = self.compute_sum_se()
+        done = False
+        se_diff = sum_se - self.max_sumSE
+        reward = se_diff
+        # Compare current overall SE with previous overall SE,
+        # if it is better the reward is better, else not
+
+        if se_diff > 0:
+            self.max_sumSE = sum_se
+            self.max_sumse_rho = self.rho
+            self.peak_sumse_step = self.elapsed_step
+            self.consecutive_keep += 1
+            # check if SE is saturated
+            if self.consecutive_keep >= self.max_keep:
+                # Encourage the agent to keep SE constant
+                # if it can not be improved anymore
+                reward += self.max_keep
+                done = True
+                self.sum_SE = sum_se
+                return reward, done
+        else:
+            self.consecutive_keep = 0
+        self.sum_SE = sum_se
+        return reward, done
+
+    def compute_punishment(self, false_rho):
+        # Correct any negative rho by its absolute value
+        false_rho[false_rho < 0] = np.absolute(false_rho[false_rho < 0])
+        # Compute spectral efficiency
+        sum_se = self.compute_sum_se(false_rho)
+
+        reward = -np.absolute(sum_se - self.max_sumSE)
+
+        return reward
