@@ -63,16 +63,19 @@ if __name__ == "__main__":
         env_ver = args.version
     # End of hyperparameters
 
-    nbr_of_BSs = 4
-    nbr_of_UEs = 5
+    nbr_of_BSs = int(config.get("L", 4))
+    nbr_of_UEs = int(config.get("K", 5))
+    attenna_arr_size = int(config.get("M", 100))
+    per_UE_max_pwr = int(config.get("P", 100))
 
     save_weights = 100
     # train_log = train_logger(filepath='logs/mimo_maxmin_trainer.txt')
 
     # Create and extract environment information
     mimo_net = make(f'gym_cont_mimo_env:mimo-v{env_ver}',
-                    L=nbr_of_BSs, K=nbr_of_UEs, M=100, ASD_deg=10,
-                    max_steps=max_steps, delta_rho=delta_rho)
+                    L=nbr_of_BSs, K=nbr_of_UEs, M=attenna_arr_size, ASD_deg=10,
+                    max_power_per_UE = per_UE_max_pwr, delta_rho=delta_rho,
+                    max_steps=max_steps)
     if env_ver == 0:
         obs_dim = nbr_of_UEs * nbr_of_BSs * (1 + (nbr_of_UEs * nbr_of_BSs))
     elif env_ver == 1:
@@ -175,7 +178,7 @@ if __name__ == "__main__":
 
         print(f"Done episode {episode+1}")
         if (episode+1) % eval_interval == 0:
-            validate_train_process(mimo_net, td3_agent, num_tests=2500)
+            validate_train_process(mimo_net, td3_agent, num_tests=500)
 
     # x = [i+1 for i in range(num_episodes)]
     # plot_learning_curve(x, episode_total_reward, "data/td3_mimo.png")
