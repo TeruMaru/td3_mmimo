@@ -668,7 +668,7 @@ class MIMOEnv(gym.Env):
                 # should be a tensor of shape M(arrays) x K(UEs) x L(cells) and reshaped into a matrix of shape
                 # (M, K*L). The transpose order is to match Matlab's reshape rule
                 H_j = np.transpose(
-                    H[:, n, :, :, j], (0, 2, 1)).reshape((100, 5 * 4))
+                    H[:, n, :, :, j], (0, 2, 1)).reshape((self.M, self.K * self.L))
 
                 # Same operation on H_hat
                 H_hat_j = np.transpose(H_hat[:, n, :, :, j], (0, 2, 1)).reshape(

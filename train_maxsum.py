@@ -178,7 +178,7 @@ if __name__ == "__main__":
 
         print(f"Done episode {episode+1}")
         if (episode+1) % eval_interval == 0:
-            validate_train_process(mimo_net, td3_agent, num_tests=500)
+            validate_train_process(mimo_net, td3_agent, num_tests=300)
 
     # x = [i+1 for i in range(num_episodes)]
     # plot_learning_curve(x, episode_total_reward, "data/td3_mimo.png")

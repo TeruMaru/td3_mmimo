@@ -21,7 +21,10 @@ tf.random.set_seed(2022)
 
 def validate_train_process(mimo_net, td3_agent, num_tests=2500):
     # Load test data
-    ref_data = sio.loadmat("D:\Work\matlab_ref\Deep-Learning-Power-Allocation-in-Massive-MIMO-master\MyDataFile.mat")
+    ## Config 1 to 4
+    # ref_data = sio.loadmat("D:\Work\matlab_ref\Deep-Learning-Power-Allocation-in-Massive-MIMO-master\MyDataFile.mat")
+    ## Config 5
+    ref_data = sio.loadmat("D:\Work\sumse_mmimo_power_alloc_exp_env\ExtendedNet.mat")
     ref_pos = ref_data["input_positions"][:, :, :num_tests]
     ref_maxprod_sumSE = np.sum(ref_data['SE_MMMSE_maxprod'], axis=(0, 1))[:num_tests]
 
