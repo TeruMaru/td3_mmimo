@@ -1,17 +1,18 @@
+import argparse
 import datetime
 import sys
-import argparse
 import gym
 import json
-import tensorflow as tf
 import numpy as np
+import os
+import tensorflow as tf
 
+from gym.envs.registration import make
 from itertools import count
-from tensorflow import keras
 from td3_agent import Agent
+from tensorflow import keras
 from utils import plot_learning_curve, visualize_eps_length
 from validate_maxmin import validate_train_process
-from gym.envs.registration import make
 
 
 np.random.seed(2022)
@@ -31,7 +32,8 @@ if __name__ == "__main__":
         '-v', '--version', help='Specify environment version to work with', default=0)
     parser.add_argument(
         '-c', '--config', help='Specify hyperparameters config file', type=str)
-
+    parser.add_argument(
+        '--inline_validation', help='Validate while traning', action='store_true')
     args = parser.parse_args()
     assert args.mode != None, "Please define training mode. Available modes are:\n\t+ Scratch: Train from scratch\n\t+ Continue: Continue to train from previous saved models"
 
@@ -115,6 +117,8 @@ if __name__ == "__main__":
         episode_durations = \
                     np.load('data/elapsed_episodes_durations.npy').tolist()
 
+    if args.inline_validation:
+        validation_ref = os.path.join(os.getcwd(), "MyDataFile.mat")
     np.set_printoptions(threshold=sys.maxsize, suppress=True)
 
     for episode in range(start_eps, num_episodes):
@@ -177,8 +181,9 @@ if __name__ == "__main__":
               )
 
         print(f"Done episode {episode+1}")
-        if (episode+1) % eval_interval == 0:
-            validate_train_process(mimo_net, td3_agent, num_tests=300)
+        if args.inline_validation:
+            if (episode+1) % eval_interval == 0:
+                validate_train_process(mimo_net, td3_agent, ref_path=validation_ref, num_tests=300)
 
     # x = [i+1 for i in range(num_episodes)]
     # plot_learning_curve(x, episode_total_reward, "data/td3_mimo.png")

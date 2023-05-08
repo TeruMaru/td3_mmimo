@@ -98,7 +98,7 @@ class Agent(object):
         for (a, b) in zip(target_weights, weights):
             a.assign(b * tau + a * (1 - tau))
 
-    def choose_action(self, state):
+    def choose_action(self, state, training=True):
         if self.agent_step < self.warmup:
             mu = np.random.normal(scale=self.warmup_noise_std,
                                   size=(self.action_dim,))
@@ -122,8 +122,10 @@ class Agent(object):
         #     mu_prime = mu
         mu_prime = tf.clip_by_value(mu,
                                     -self.action_bound, self.action_bound)
-
-        self.agent_step += 1
+        if training:
+            self.agent_step += 1
+        else:
+            pass
         return mu_prime
 
     def memorize(self, state, action, reward, next_state, done):
