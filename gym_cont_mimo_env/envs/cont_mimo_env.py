@@ -61,6 +61,8 @@ class MIMOEnv(gym.Env):
                                         high=self.delta_rho,
                                         shape=(self.K*self.L,),
                                         dtype=np.float64)
+        
+        self.observation_space = spaces.Space(shape=(1,self.K * self.L * (1+ self.K * self.L)))
 
         self.peak_sumse_step = 0
 
