@@ -7,6 +7,7 @@ import tensorflow as tf
 from tqdm import tqdm
 import sys
 import scipy.io as sio
+import os
 
 from itertools import count
 from tensorflow import keras
@@ -102,6 +103,7 @@ if __name__ == "__main__":
     actors_hsize = config["actors_hsize"]
     critic_hsize = config["critic_hsize"]
     num_episodes = config["num_episodes"]
+    max_steps = config["max_steps"]
     delta_rho = config["delta_rho"]
     if args.version == 0:
         env_ver = config["env_ver"]
@@ -109,15 +111,23 @@ if __name__ == "__main__":
         env_ver = args.version
     # End of hyperparameters
 
-    nbr_of_BSs = 4
-    nbr_of_UEs = 5
+    nbr_of_BSs = int(config.get("L", 4))
+    nbr_of_UEs = int(config.get("K", 5))
+    attenna_arr_size = int(config.get("M", 100))
+    print(f"Attenna size: {attenna_arr_size}")
+    per_UE_max_pwr = int(config.get("P", 100))
 
+    validate_filename = os.path.join(os.getcwd(), f"MyDataFile_M={attenna_arr_size}.mat")
     # Create and extract environment information
     mimo_net = make('gym_cont_mimo_env:mimo-v{}'.format(env_ver),
-                    L=nbr_of_BSs, K=nbr_of_UEs, M=100, ASD_deg=10,
-                    delta_rho=delta_rho, val=True)
+                    L=nbr_of_BSs, K=nbr_of_UEs, M=attenna_arr_size, ASD_deg=10,
+                    max_power_per_UE = per_UE_max_pwr, delta_rho=delta_rho,
+                    max_steps=max_steps, val=True)
 
-    obs_dim = 3*nbr_of_UEs*nbr_of_BSs
+    if env_ver == 0:
+        obs_dim = nbr_of_UEs * nbr_of_BSs * (1 + (nbr_of_UEs * nbr_of_BSs))
+    elif env_ver == 1:
+        obs_dim = nbr_of_UEs * nbr_of_BSs * (2 + (nbr_of_UEs * nbr_of_BSs))
     action_dim = mimo_net.action_space.shape[0]
     action_bound = mimo_net.action_space.high[0]
 
@@ -137,6 +147,6 @@ if __name__ == "__main__":
     # Load model's weights
     td3_agent.load_models()
 
-    validate_train_process(mimo_net, td3_agent, num_tests=2500)
+    validate_train_process(mimo_net, td3_agent, ref_path=validate_filename, num_tests=2000)
 
 
