@@ -20,12 +20,16 @@ np.random.seed(2022)
 tf.random.set_seed(2022)
 
 
-def validate_train_process(mimo_net, td3_agent, ref_path="D:\Work\matlab_ref\Deep-Learning-Power-Allocation-in-Massive-MIMO-master\MyDataFile.mat", num_tests=2500):
+def validate_train_process(mimo_net, td3_agent, num_tests=2500, ref_path=None, save_dir=None):
     # Load test data
     ## Config 1 to 4
     # ref_data = sio.loadmat("D:\Work\matlab_ref\Deep-Learning-Power-Allocation-in-Massive-MIMO-master\MyDataFile.mat")
     ## Config 5
     # ref_data = sio.loadmat("D:\Work\sumse_mmimo_power_alloc_exp_env\ExtendedNet.mat")
+    if ref_path is None:
+        sys.exit("Path to reference data must be provided")
+    if save_dir is None:
+        save_dir = os.getcwd()
     ref_data = sio.loadmat(ref_path)
     ref_pos = ref_data["input_positions"][:, :, :num_tests]
     ref_maxprod_sumSE = np.sum(ref_data['SE_MMMSE_maxprod'], axis=(0, 1))[:num_tests]
@@ -35,6 +39,7 @@ def validate_train_process(mimo_net, td3_agent, ref_path="D:\Work\matlab_ref\Dee
 
     episode_durations = []
     episode_total_reward = []
+    episode_last_pwr = []
 
     for episode in tqdm(range(num_tests)):
         # This is a 1-D numpy array.
@@ -54,18 +59,21 @@ def validate_train_process(mimo_net, td3_agent, ref_path="D:\Work\matlab_ref\Dee
                 episode_durations.append(time_step)
                 episode_esc_sumSE.append(mimo_net.compute_sum_se())
                 episode_max_sumSE.append(mimo_net.max_sumSE)
+                episode_last_pwr.append(mimo_net.rho)
                 break
 
     plot_SEs_CDF(episode_esc_sumSE, ref_maxprod_sumSE, save_name="Sum_SE_CDFs", xlabel="SE values")
-
-    min_SE_diff = np.abs(episode_esc_sumSE - ref_maxprod_sumSE)/ref_maxprod_sumSE
-    np.save('data/min_SE_diff.npy', min_SE_diff)
-    plot_save_cdf(min_SE_diff, save_name="actual_diff",
-                     xlabel="Actual sum SE difference")
-    potential_diff = np.abs(episode_max_sumSE - ref_maxprod_sumSE)/ref_maxprod_sumSE
-    np.save('data/potential_diff.npy', potential_diff)
-    plot_save_cdf(potential_diff, save_name="potential_diff",
-                  xlabel="Potential sum SE difference")
+    np.save(f'{save_dir}/esc_sumSE.npy', episode_esc_sumSE)
+    np.save(f'{save_dir}/max_sumSE.npy', episode_max_sumSE)
+    np.save(f'{save_dir}/last_pwr.npy', episode_last_pwr)
+    # min_SE_diff = np.abs(episode_esc_sumSE - ref_maxprod_sumSE)/ref_maxprod_sumSE
+    # np.save('data/min_SE_diff.npy', min_SE_diff)
+    # plot_save_cdf(min_SE_diff, save_name="actual_diff",
+    #                  xlabel="Actual sum SE difference")
+    # potential_diff = np.abs(episode_max_sumSE - ref_maxprod_sumSE)/ref_maxprod_sumSE
+    # np.save('data/potential_diff.npy', potential_diff)
+    # plot_save_cdf(potential_diff, save_name="potential_diff",
+    #               xlabel="Potential sum SE difference")
     ratio_to_ref = compare_results(episode_esc_sumSE, ref_maxprod_sumSE)
     print(f"TD3 model achieved {ratio_to_ref}% as compared to geometric programming")
 
@@ -147,6 +155,6 @@ if __name__ == "__main__":
     # Load model's weights
     td3_agent.load_models()
 
-    validate_train_process(mimo_net, td3_agent, ref_path=validate_filename, num_tests=2000)
+    validate_train_process(mimo_net, td3_agent, ref_path=validate_filename, num_tests=2000, save_dir="data")
 
 
