@@ -69,6 +69,9 @@ if __name__ == "__main__":
     nbr_of_UEs = int(config.get("K", 5))
     attenna_arr_size = int(config.get("M", 100))
     per_UE_max_pwr = int(config.get("P", 100))
+    data_repository = config.get("data_dir", "data")
+    model_repository = config.get("model_dir", "models")
+    matlab_ref = config.get("ref_file", "MyDataFile.mat")
 
     save_weights = 100
     # train_log = train_logger(filepath='logs/mimo_maxmin_trainer.txt')
@@ -95,7 +98,8 @@ if __name__ == "__main__":
                       tgt_actor_noise_bound=smooth_bound,
                       tgt_actor_smooth_std=smooth_std,
                       actor_hdims=actors_hsize.copy(),
-                      critic_hdims=critic_hsize.copy())
+                      critic_hdims=critic_hsize.copy(),
+                      model_repo=model_repository, data_repo=data_repository)
 
     start_eps = 0
     episode_total_reward = []
@@ -109,16 +113,16 @@ if __name__ == "__main__":
         # Load models
         td3_agent.load_models()
         # Load starting episode
-        start_eps = np.load('data/elapsed_episodes.npy') + 1
+        start_eps = np.load(f'{data_repository}/elapsed_episodes.npy') + 1
         # Load episodes total reward
         episode_total_reward = \
-                      np.load('data/elapsed_episodes_rewards.npy').tolist()
+                      np.load(f'{data_repository}/elapsed_episodes_rewards.npy').tolist()
         # Load episodes durations
         episode_durations = \
-                    np.load('data/elapsed_episodes_durations.npy').tolist()
+                    np.load(f'{data_repository}/elapsed_episodes_durations.npy').tolist()
 
     if args.inline_validation:
-        validation_ref = os.path.join(os.getcwd(), "MyDataFile.mat")
+        validation_ref = os.path.join(os.getcwd(), f"{matlab_ref}")
     np.set_printoptions(threshold=sys.maxsize, suppress=True)
 
     for episode in range(start_eps, num_episodes):
@@ -158,16 +162,16 @@ if __name__ == "__main__":
             # Save models
             td3_agent.save_models()
             # Save elasped episodes
-            np.save('data/elapsed_episodes.npy', episode)
+            np.save(f'{data_repository}/elapsed_episodes.npy', episode)
             # Save episodes' total rewards
-            np.save('data/elapsed_episodes_rewards.npy', episode_total_reward)
+            np.save(f'{data_repository}/elapsed_episodes_rewards.npy', episode_total_reward)
             # Save episodes' durations
-            np.save('data/elapsed_episodes_durations.npy', episode_durations)
+            np.save(f'{data_repository}/elapsed_episodes_durations.npy', episode_durations)
             
             x = [i+1 for i in range(episode+1)]
-            plot_learning_curve(x, episode_total_reward, "data/td3_mimo.png")
+            plot_learning_curve(x, episode_total_reward, f"{data_repository}/td3_mimo.png")
             # visualize_loss(cummulative_loss)
-            visualize_eps_length(x, episode_durations, "data/eps_length.png")
+            visualize_eps_length(x, episode_durations, f"{data_repository}/eps_length.png")
 
         print((f'Score: {total_reward:.5f}'
                f' - Steps taken: {time_step}'
@@ -186,8 +190,8 @@ if __name__ == "__main__":
                 validate_train_process(mimo_net, td3_agent, ref_path=validation_ref, num_tests=300)
 
     # x = [i+1 for i in range(num_episodes)]
-    # plot_learning_curve(x, episode_total_reward, "data/td3_mimo.png")
+    # plot_learning_curve(x, episode_total_reward, f"{data_repository}/td3_mimo.png")
     # # visualize_loss(cummulative_loss)
-    # visualize_eps_length(x, episode_durations, "data/eps_length.png")
+    # visualize_eps_length(x, episode_durations, f"{data_repository}/eps_length.png")
     # train_log.logger.info("Agent took {} steps, with last exploration rate = {}".format(
     #     agent.current_step, agent.strategy.get_exploration_rate(agent.current_step)))

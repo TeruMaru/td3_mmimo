@@ -62,7 +62,7 @@ def validate_train_process(mimo_net, td3_agent, num_tests=2500, ref_path=None, s
                 episode_last_pwr.append(mimo_net.rho)
                 break
 
-    plot_SEs_CDF(episode_esc_sumSE, ref_maxprod_sumSE, save_name="Sum_SE_CDFs", xlabel="SE values")
+    plot_SEs_CDF(episode_esc_sumSE, ref_maxprod_sumSE, save_dir=td3_agent.data_repo, save_name="Sum_SE_CDFs", xlabel="SE values")
     np.save(f'{save_dir}/esc_sumSE.npy', episode_esc_sumSE)
     np.save(f'{save_dir}/max_sumSE.npy', episode_max_sumSE)
     np.save(f'{save_dir}/last_pwr.npy', episode_last_pwr)
@@ -122,10 +122,12 @@ if __name__ == "__main__":
     nbr_of_BSs = int(config.get("L", 4))
     nbr_of_UEs = int(config.get("K", 5))
     attenna_arr_size = int(config.get("M", 100))
-    print(f"Attenna size: {attenna_arr_size}")
     per_UE_max_pwr = int(config.get("P", 100))
+    data_repository = config.get("data_dir", "data")
+    model_repository = config.get("model_dir", "models")
+    matlab_ref = config.get("ref_file", "MyDataFile.mat")
 
-    validate_filename = os.path.join(os.getcwd(), f"MyDataFile_M={attenna_arr_size}.mat")
+    validate_filename = os.path.join(os.getcwd(), f"{matlab_ref}")
     # Create and extract environment information
     mimo_net = make('gym_cont_mimo_env:mimo-v{}'.format(env_ver),
                     L=nbr_of_BSs, K=nbr_of_UEs, M=attenna_arr_size, ASD_deg=10,
@@ -149,12 +151,12 @@ if __name__ == "__main__":
                       tgt_actor_noise_bound=smooth_bound,
                       tgt_actor_smooth_std=smooth_std,
                       actor_hdims=actors_hsize.copy(),
-                      critic_hdims=critic_hsize.copy())
+                      critic_hdims=critic_hsize.copy(),
+                      model_repo=model_repository, data_repo=data_repository)
 
     print("Loading model from latest checkpoint")
     # Load model's weights
     td3_agent.load_models()
-
-    validate_train_process(mimo_net, td3_agent, ref_path=validate_filename, num_tests=2000, save_dir="data")
+    validate_train_process(mimo_net, td3_agent, ref_path=validate_filename, num_tests=2000, save_dir=data_repository)
 
 

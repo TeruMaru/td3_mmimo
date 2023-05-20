@@ -1,0 +1,35 @@
+{
+    "env_ver": 1,
+    "alpha": 8e-4,
+    "beta": 14e-3,
+    "tau": 0.05,
+    "gamma": 0.8,
+    "batch_size": 400,
+    "warmup": 1800,
+    "memory_size": 50000,
+    "smooth_bound": 0.5,
+    "smooth_std": 0.2,
+    "warmup_noise_std": 5,
+    "noise_start": 20,
+    "noise_end": 0.001,
+    "eps_decay": 1e-7,
+    "updt_delay": 5,
+    "actors_hsize": [
+        512,
+        800,
+        600,
+        420
+    ],
+    "critic_hsize": [
+        512,
+        256,
+        288
+    ],
+    "num_episodes": 250000,
+    "max_steps": 100,
+    "delta_rho": 20,
+    "data_dir": "v1_data_M=50",
+    "model_dir": "v1_models_M=50",
+    "ref_file": "MyDataFile_M=50.mat",
+    "M": 50
+}

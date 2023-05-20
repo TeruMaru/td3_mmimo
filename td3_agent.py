@@ -23,7 +23,8 @@ class Agent(object):
                  noise_end = 0.0001, eps_decay=1e-6, gamma=0.99,
                  delay_factor=2, batch_size=64, tau=0.05, warmup=1000,
                  warmup_noise_std = 5, tgt_actor_noise_bound=0.5,
-                 tgt_actor_smooth_std=0.2,actor_hdims=[], critic_hdims=[]):
+                 tgt_actor_smooth_std=0.2,actor_hdims=[], critic_hdims=[],
+                 model_repo="models", data_repo="data"):
         self.gamma = gamma
         self.tau = tau
         self.batch_size = batch_size
@@ -33,6 +34,8 @@ class Agent(object):
         self.strategy = EpsilonGreedyStrategy(noise_start,
                                               noise_end,
                                               eps_decay)
+        self.model_repo = model_repo
+        self.data_repo = data_repo
         self.obs_dim = obs_dim
         self.action_dim = action_dim
         self.action_bound = action_bound
@@ -45,23 +48,29 @@ class Agent(object):
         self.memory = MemoryBuffer(memory_capacity, obs_dim, action_dim)
 
         self.actor = Actor(alpha, obs_dim, action_dim, action_bound,
+                           ckpt_parent_dir=self.model_repo,
                            name='real_actor', hidden_dims=actor_hdims.copy())
 
         self.target_actor = Actor(alpha, obs_dim, action_dim, action_bound,
+                                  ckpt_parent_dir=self.model_repo,
                                   name='target_actor', hidden_dims=actor_hdims.copy())
 
         self.critic_1 = Critic(beta, obs_dim, action_dim, name='real_critic_1',
+                               ckpt_parent_dir=self.model_repo,
                                hidden_dims=critic_hdims.copy())
 
         self.target_critic_1 = Critic(beta, obs_dim, action_dim,
                                       name='target_critic_1',
+                                      ckpt_parent_dir=self.model_repo,
                                       hidden_dims=critic_hdims.copy())
 
         self.critic_2 = Critic(beta, obs_dim, action_dim, name='real_critic_2',
+                               ckpt_parent_dir=self.model_repo,
                                hidden_dims=critic_hdims.copy())
 
         self.target_critic_2 = Critic(beta, obs_dim, action_dim,
                                       name='target_critic_2',
+                                      ckpt_parent_dir=self.model_repo,
                                       hidden_dims=critic_hdims.copy())
 
         self.actor.model.compile(optimizer=self.actor.optimizer)
@@ -213,8 +222,8 @@ class Agent(object):
 
     def save_models(self):
         # Create parent dirs
-        Path('models').mkdir(exist_ok=True)
-        Path('data').mkdir(exist_ok=True)
+        Path(self.model_repo).mkdir(exist_ok=True)
+        Path(self.data_repo).mkdir(exist_ok=True)
         # Save Neural Nets
         print('... saving models ...')
         self.actor.model.save(self.actor.checkpoint_dir)
@@ -225,12 +234,12 @@ class Agent(object):
         self.target_critic_2.model.save(self.target_critic_2.checkpoint_dir)
 
         # Save memory buffer
-        self.memory.save_memory()
+        self.memory.save_memory(path=self.data_repo)
 
         # Save counters
         cntr_arr = np.array([self.agent_step, self.learn_step_cntr,
                              self.memory.mem_cntr])
-        np.save("data/cntr_arr.npy",cntr_arr)
+        np.save(f"{self.data_repo}/cntr_arr.npy",cntr_arr)
 
     def load_models(self):
         print('... loading models ...')
@@ -249,8 +258,8 @@ class Agent(object):
             self.target_critic_2.checkpoint_dir)
 
         # Load memory buffer
-        self.memory.load_memory()
+        self.memory.load_memory(self.data_repo)
 
         # Load agent's step counter
         self.agent_step, self.learn_step_cntr, self.memory.mem_cntr =\
-                     np.load("data/cntr_arr.npy")
+                     np.load(f"{self.data_repo}/cntr_arr.npy")

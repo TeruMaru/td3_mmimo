@@ -34,7 +34,7 @@ def visualize_eps_length(x, episode_durations, figure_file):
     plt.close()
 
 
-def plot_save_cdf(data_arr, save_name=None, xlabel=None):
+def plot_save_cdf(data_arr, save_dir=None, save_name=None, xlabel=None):
     nbr_samples = data_arr.shape[0]
     unique, counts = np.unique(data_arr, return_counts=True)
     prob = counts/nbr_samples
@@ -43,9 +43,9 @@ def plot_save_cdf(data_arr, save_name=None, xlabel=None):
     plt.xlabel(xlabel)
     plt.ylabel("CDF")
     plt.plot(unique, cdf)
-    plt.savefig(f'data/{save_name}.png')
+    plt.savefig(f'{save_dir}/{save_name}.png')
 
-def plot_SEs(td3_sumSE, ref_sumSE, save_name=None,):
+def plot_SEs(td3_sumSE, ref_sumSE,  save_dir=None, save_name=None,):
     assert len(td3_sumSE) == len(ref_sumSE), "TD3 and ref does not produce arrays with same shape"
     nbr_samples = len(td3_sumSE)
     figure = plt.figure(figsize=(10, 10))
@@ -54,9 +54,9 @@ def plot_SEs(td3_sumSE, ref_sumSE, save_name=None,):
     plt.plot(range(nbr_samples), td3_sumSE, label='sun SE by TD3 agent')
     plt.plot(range(nbr_samples), ref_sumSE, label='sum SE by ref')
     plt.legend()
-    plt.savefig(f'data/{save_name}.png')
+    plt.savefig(f'{save_dir}/{save_name}.png')
 
-def plot_SEs_CDF(td3_sumSE, ref_sumSE, save_name=None, xlabel=None):
+def plot_SEs_CDF(td3_sumSE, ref_sumSE, save_dir=None, save_name=None, xlabel=None):
     assert len(td3_sumSE) == len(ref_sumSE), "TD3 and ref does not produce arrays with same shape"
     nbr_samples = len(td3_sumSE)
     td3_unique, td3_counts = np.unique(td3_sumSE, return_counts=True)
@@ -73,7 +73,7 @@ def plot_SEs_CDF(td3_sumSE, ref_sumSE, save_name=None, xlabel=None):
              label='sum SE CDF by TD3 agent')
     plt.plot(ref_unique, ref_cdf, label='sum SE CDF by ref')
     plt.legend()
-    plt.savefig(f'data/{save_name}.png')
+    plt.savefig(f'{save_dir}/{save_name}.png')
 
 def compare_results(td3_SE, geo_SE):
     td3_avg = np.average(td3_SE)
