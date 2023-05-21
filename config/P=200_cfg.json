@@ -1,9 +1,9 @@
 {
-    "env_ver": 0,
+    "env_ver": 1,
     "alpha": 8e-4,
-    "beta": 28e-3,
+    "beta": 14e-3,
     "tau": 0.05,
-    "gamma": 0.995,
+    "gamma": 0.8,
     "batch_size": 400,
     "warmup": 1800,
     "memory_size": 50000,
@@ -12,8 +12,8 @@
     "warmup_noise_std": 5,
     "noise_start": 20,
     "noise_end": 0.001,
-    "eps_decay": 1e-6,
-    "updt_delay": 4,
+    "eps_decay": 1e-7,
+    "updt_delay": 5,
     "actors_hsize": [
         512,
         800,
@@ -26,9 +26,10 @@
         288
     ],
     "num_episodes": 250000,
-    "max_steps": 200,
-    "data_dir": "v0_data_cfg2",
-    "model_dir": "v0_models_cfg2",
-    "ref_file": "MyDataFile_M=100.mat",
-    "delta_rho": 16
+    "max_steps": 100,
+    "delta_rho": 20,
+    "data_dir": "v1_data_P=200",
+    "model_dir": "v1_models_P=200",
+    "ref_file": "MyDataFile_M=75.mat",
+    "P": 200
 }

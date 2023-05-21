@@ -82,4 +82,4 @@ def compare_results(td3_SE, geo_SE):
     print(f"Average SE from geometric progarmming: {geo_avg}")
     # ratio = ((geo_avg - td3_avg) * 100) / geo_avg
     ratio = (td3_avg/geo_avg) * 100
-    return ratio
+    return ratio, td3_avg, geo_avg

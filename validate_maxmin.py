@@ -74,7 +74,7 @@ def validate_train_process(mimo_net, td3_agent, num_tests=2500, ref_path=None, s
     # np.save('data/potential_diff.npy', potential_diff)
     # plot_save_cdf(potential_diff, save_name="potential_diff",
     #               xlabel="Potential sum SE difference")
-    ratio_to_ref = compare_results(episode_esc_sumSE, ref_maxprod_sumSE)
+    ratio_to_ref, _, _ = compare_results(episode_esc_sumSE, ref_maxprod_sumSE)
     print(f"TD3 model achieved {ratio_to_ref}% as compared to geometric programming")
 
 if __name__ == "__main__":

@@ -28,5 +28,7 @@
     "num_episodes": 250000,
     "max_steps": 100,
     "delta_rho": 20,
-    "P": 200
+    "data_dir": "v1_data_P=150",
+    "model_dir": "v1_models_P=150",
+    "P": 150
 }
